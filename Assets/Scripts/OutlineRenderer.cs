@@ -3,6 +3,9 @@ using UnityEngine.Rendering;
 
 public class OutlineRenderer : MonoBehaviour
 {
+    [SerializeField, Range(0, 20)] float width;
+    [SerializeField, Range(0, 1)] float softness;
+
     [SerializeField] ComputeShader jumpFloodShader;
 
     private Camera cam;
@@ -14,6 +17,7 @@ public class OutlineRenderer : MonoBehaviour
     private RenderTexture jumpFloodBuffer1;
 
     private Material silhouetteMaterial;
+    private Material outlineMaterial;
 
     private readonly int SilhouetteParamId = Shader.PropertyToID("Silhouette");
     private readonly int InputParamId = Shader.PropertyToID("Input");
@@ -31,6 +35,7 @@ public class OutlineRenderer : MonoBehaviour
         cam.AddCommandBuffer(CameraEvent.BeforeForwardAlpha, cmd);
 
         silhouetteMaterial = new Material(Shader.Find("Outline/Silhouette"));
+        outlineMaterial = new Material(Shader.Find("Outline/Outline"));
 
         JfaInitKernerlID = jumpFloodShader.FindKernel("Init");
         JfaStepKernerlID = jumpFloodShader.FindKernel("JumpFloodStep");
@@ -38,24 +43,31 @@ public class OutlineRenderer : MonoBehaviour
 
     private void Update()
     {
+        outlineMaterial.SetFloat("_Width", width);
+        outlineMaterial.SetFloat("_Softness", softness);
+
         InitRenderTextures();
         cmd.Clear();
-
         cmd.SetRenderTarget(silhouetteBuffer);
+        cmd.ClearRenderTarget(true, true, Color.clear);
         for (int i = 0; i < outlinedObjects.Length; i++)
         {
             cmd.DrawRenderer(outlinedObjects[i].Renderer, silhouetteMaterial);
         }
-
-        DoJumpFlood(cmd);
-
         
+        DoJumpFlood(cmd, 3);
+        cmd.Blit(jumpFloodBuffer0, BuiltinRenderTextureType.CameraTarget, outlineMaterial);
     }
 
-    private void DoJumpFlood(CommandBuffer cmd)
+    private void DoJumpFlood(CommandBuffer cmd, int passes)
     {
+        bool startBuff = passes % 2 == 0;
+        RenderTexture bf0 = startBuff ? jumpFloodBuffer0 : jumpFloodBuffer1;
+        RenderTexture bf1 = startBuff ? jumpFloodBuffer1 : jumpFloodBuffer0;
+
+
         cmd.SetComputeTextureParam(jumpFloodShader, JfaInitKernerlID, SilhouetteParamId, silhouetteBuffer);
-        cmd.SetComputeTextureParam(jumpFloodShader, JfaInitKernerlID, OutputParamId, jumpFloodBuffer0);
+        cmd.SetComputeTextureParam(jumpFloodShader, JfaInitKernerlID, OutputParamId, bf0);
         cmd.DispatchCompute(jumpFloodShader, JfaInitKernerlID,
             ThreadGroups(Screen.width), ThreadGroups(Screen.height), 1);
 
@@ -63,20 +75,20 @@ public class OutlineRenderer : MonoBehaviour
         cmd.SetComputeIntParam(jumpFloodShader, "BufferWidth", Screen.width);
         cmd.SetComputeIntParam(jumpFloodShader, "BufferHeight", Screen.height);
 
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < passes; i++)
         {
             int stepSize = Mathf.RoundToInt(Mathf.Pow(2, i));
             cmd.SetComputeIntParam(jumpFloodShader, "StepWidth", stepSize);
 
             if (pingPong)
             {
-                cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, InputParamId, jumpFloodBuffer1);
-                cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, OutputParamId, jumpFloodBuffer0);
+                cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, InputParamId, bf1);
+                cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, OutputParamId, bf0);
             }
             else
             {
-                cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, InputParamId, jumpFloodBuffer0);
-                cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, OutputParamId, jumpFloodBuffer1);
+                cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, InputParamId, bf0);
+                cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, OutputParamId, bf1);
             }
 
             cmd.DispatchCompute(jumpFloodShader, JfaStepKernerlID,
