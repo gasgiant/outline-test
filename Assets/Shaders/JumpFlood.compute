@@ -1,0 +1,48 @@
+#pragma kernel Init
+#pragma kernel JumpFloodStep
+
+Texture2D<float> Silhouette;
+Texture2D<float2> Input;
+RWTexture2D<float2> Output;
+uint BufferWidth;
+uint BufferHeight;
+uint StepWidth;
+
+#define JFA_NULL -1.0
+
+[numthreads(8, 8, 1)]
+void Init(uint3 id : SV_DispatchThreadID)
+{
+    if (Silhouette[id.xy] > 0.01)
+        Output[id.xy] = id.xy;
+    else
+        Output[id.xy] = JFA_NULL;
+}
+
+[numthreads(8,8,1)]
+void JumpFloodStep (uint3 id : SV_DispatchThreadID)
+{
+    float bestDist = 1.#INF;
+    float2 bestPos;
+
+    [unroll]
+    for (int u = -1; u <= 1; u++)
+    {
+        [unroll]
+        for (int v = -1; v <= 1; v++)
+        {
+            int2 offsetID = clamp(id.xy + int2(u, v) * StepWidth, 0, int2(BufferWidth - 1, BufferHeight - 1));
+            float2 storedPos = Input[offsetID];
+            float2 disp = storedPos - id.xy;
+            float dist = dot(disp, disp);
+
+            if (storedPos.x != JFA_NULL && dist < bestDist)
+            {
+                bestDist = dist;
+                bestPos = storedPos;
+            }
+        }
+    }
+
+    Output[id.xy] = bestDist < 1.#INF ? bestPos : JFA_NULL;
+}
