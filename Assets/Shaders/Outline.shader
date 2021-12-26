@@ -51,7 +51,7 @@ Shader "Outline/Outline"
 
                 float distance = length(pos - input.positionHCS.xy + 0.5);
 
-                float alpha = saturate((_Width - distance) * (1 - _Softness)) * (distance > 0);
+                float alpha = saturate((_Width - distance) / (100 * _Softness + 0.05)) * (distance > 0);
 
                 return float4(1, 0, 0, alpha);
             }

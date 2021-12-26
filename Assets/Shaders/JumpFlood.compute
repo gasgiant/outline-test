@@ -1,9 +1,14 @@
 #pragma kernel Init
 #pragma kernel JumpFloodStep
 
+#include "UnityCG.cginc"
+
 Texture2D<float> Silhouette;
-Texture2D<float2> Input;
-RWTexture2D<float2> Output;
+Texture2D<float> Depth;
+
+Texture2D<float4> Input;
+RWTexture2D<float4> Output;
+float OutlineWidth;
 uint BufferWidth;
 uint BufferHeight;
 uint StepWidth;
@@ -13,8 +18,10 @@ uint StepWidth;
 [numthreads(8, 8, 1)]
 void Init(uint3 id : SV_DispatchThreadID)
 {
-    if (Silhouette[id.xy] > 0.01)
-        Output[id.xy] = id.xy;
+    float value = Silhouette[id.xy];
+    if (value > 0.01)
+        //Output[id.xy] = float4(id.xy, Depth[id.xy], value);
+        Output[id.xy] = float4(id.xy, value, value);
     else
         Output[id.xy] = JFA_NULL;
 }
@@ -23,7 +30,7 @@ void Init(uint3 id : SV_DispatchThreadID)
 void JumpFloodStep (uint3 id : SV_DispatchThreadID)
 {
     float bestDist = 1.#INF;
-    float2 bestPos;
+    float4 data = Input[id.xy];
 
     [unroll]
     for (int u = -1; u <= 1; u++)
@@ -32,17 +39,23 @@ void JumpFloodStep (uint3 id : SV_DispatchThreadID)
         for (int v = -1; v <= 1; v++)
         {
             int2 offsetID = clamp(id.xy + int2(u, v) * StepWidth, 0, int2(BufferWidth - 1, BufferHeight - 1));
-            float2 storedPos = Input[offsetID];
-            float2 disp = storedPos - id.xy;
+            float4 potentialData = Input[offsetID];
+            float2 disp = potentialData.xy - id.xy;
             float dist = dot(disp, disp);
 
-            if (storedPos.x != JFA_NULL && dist < bestDist)
+            if (potentialData.x != JFA_NULL && dist < bestDist)
             {
-                bestDist = dist;
-                bestPos = storedPos;
+                if (data.a <= -1 || (data.a < potentialData.z))
+                {
+                    bestDist = dist;
+                    data.xyz = potentialData.xyz;
+                }
             }
         }
     }
 
-    Output[id.xy] = bestDist < 1.#INF ? bestPos : JFA_NULL;
+    if (data.a <= -1)
+        Output[id.xy] = bestDist < 1.#INF ? data : JFA_NULL;
+    else
+        Output[id.xy] = data;
 }

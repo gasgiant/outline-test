@@ -726,7 +726,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9345bcd1b4b4d424cb4a623d2b43a74d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  width: 3
+  width: 1.1
   softness: 0
   jumpFloodShader: {fileID: 7200000, guid: 92fd2f332309ab8489e7f446098a7967, type: 3}
 --- !u!4 &1154428612

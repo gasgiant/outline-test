@@ -20,6 +20,7 @@ public class OutlineRenderer : MonoBehaviour
     private Material outlineMaterial;
 
     private readonly int SilhouetteParamId = Shader.PropertyToID("Silhouette");
+    private readonly int DepthParamId = Shader.PropertyToID("Depth");
     private readonly int InputParamId = Shader.PropertyToID("Input");
     private readonly int OutputParamId = Shader.PropertyToID("Output");
 
@@ -52,6 +53,7 @@ public class OutlineRenderer : MonoBehaviour
         cmd.ClearRenderTarget(true, true, Color.clear);
         for (int i = 0; i < outlinedObjects.Length; i++)
         {
+            cmd.SetGlobalFloat("_ObjectID", (i + 1) / 4f);
             cmd.DrawRenderer(outlinedObjects[i].Renderer, silhouetteMaterial);
         }
         
@@ -67,17 +69,20 @@ public class OutlineRenderer : MonoBehaviour
 
 
         cmd.SetComputeTextureParam(jumpFloodShader, JfaInitKernerlID, SilhouetteParamId, silhouetteBuffer);
+        cmd.SetComputeTextureParam(jumpFloodShader, JfaInitKernerlID, DepthParamId, Shader.GetGlobalTexture("_CameraDepthTexture"));
         cmd.SetComputeTextureParam(jumpFloodShader, JfaInitKernerlID, OutputParamId, bf0);
         cmd.DispatchCompute(jumpFloodShader, JfaInitKernerlID,
             ThreadGroups(Screen.width), ThreadGroups(Screen.height), 1);
 
+    
         bool pingPong = false;
+        cmd.SetComputeFloatParam(jumpFloodShader, "OutlineWidth", width);
         cmd.SetComputeIntParam(jumpFloodShader, "BufferWidth", Screen.width);
         cmd.SetComputeIntParam(jumpFloodShader, "BufferHeight", Screen.height);
 
         for (int i = 0; i < passes; i++)
         {
-            int stepSize = Mathf.RoundToInt(Mathf.Pow(2, i));
+            int stepSize = Mathf.RoundToInt(Mathf.Pow(2, passes - 1 - i));
             cmd.SetComputeIntParam(jumpFloodShader, "StepWidth", stepSize);
 
             if (pingPong)
@@ -96,6 +101,7 @@ public class OutlineRenderer : MonoBehaviour
 
             pingPong = !pingPong;
         }
+
     }
 
     private void InitRenderTextures()
@@ -108,11 +114,12 @@ public class OutlineRenderer : MonoBehaviour
             jumpFloodBuffer0?.Release();
             jumpFloodBuffer0?.Release();
 
-            silhouetteBuffer = new RenderTexture(Screen.width, Screen.height, 16, RenderTextureFormat.R8);
+            silhouetteBuffer = new RenderTexture(Screen.width, Screen.height, 16, RenderTextureFormat.RFloat);
             silhouetteBuffer.antiAliasing = 1;
             silhouetteBuffer.Create();
 
-            jumpFloodBuffer0 = new RenderTexture(Screen.width, Screen.height, 0, RenderTextureFormat.RGHalf);
+            jumpFloodBuffer0 = new RenderTexture(Screen.width, Screen.height, 0, 
+                RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
             silhouetteBuffer.antiAliasing = 1;
             jumpFloodBuffer0.enableRandomWrite = true;
             jumpFloodBuffer0.Create();

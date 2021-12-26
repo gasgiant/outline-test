@@ -32,9 +32,11 @@ Shader "Outline/Silhouette"
                 return output;
             }
 
+            float _ObjectID;
+
             float frag (Varyings input) : SV_Target
             {
-                return 1;
+                return _ObjectID;
             }
             ENDHLSL
         }
