@@ -13,12 +13,11 @@ public class DistanceComparer : IComparer<Outlined>
 
     public int Compare(Outlined x, Outlined y)
     {
-        float dx = (x.transform.position - referenceTransform.position).sqrMagnitude;
-        float dy = (y.transform.position - referenceTransform.position).sqrMagnitude;
+        float dz = Vector3.Dot((x.transform.position - y.transform.position), referenceTransform.forward);
 
-        if (dx == dy) return 0;
+        if (dz == 0) return 0;
 
-        return dx < dy ? 1 : -1;
+        return dz < 0 ? 1 : -1;
     }
 }
 
