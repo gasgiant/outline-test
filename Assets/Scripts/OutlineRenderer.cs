@@ -1,5 +1,26 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+
+public class DistanceComparer : IComparer<Outlined>
+{
+    private Transform referenceTransform;
+
+    public DistanceComparer(Transform referenceTransform)
+    {
+        this.referenceTransform = referenceTransform;
+    }
+
+    public int Compare(Outlined x, Outlined y)
+    {
+        float dx = (x.transform.position - referenceTransform.position).sqrMagnitude;
+        float dy = (y.transform.position - referenceTransform.position).sqrMagnitude;
+
+        if (dx == dy) return 0;
+
+        return dx < dy ? 1 : -1;
+    }
+}
 
 public class OutlineRenderer : MonoBehaviour
 {
@@ -9,14 +30,15 @@ public class OutlineRenderer : MonoBehaviour
     [SerializeField] ComputeShader jumpFloodShader;
 
     private Camera cam;
-    private Outlined[] outlinedObjects;
+    private List<Outlined> outlinedObjects;
+    private DistanceComparer distanceComparer;
 
     private CommandBuffer cmd;
     private RenderTexture silhouetteBuffer;
     private RenderTexture jumpFloodBuffer0;
     private RenderTexture jumpFloodBuffer1;
 
-    private Material silhouetteMaterial;
+    
     private Material outlineMaterial;
 
     private readonly int SilhouetteParamId = Shader.PropertyToID("Silhouette");
@@ -30,12 +52,19 @@ public class OutlineRenderer : MonoBehaviour
     private void Start()
     {
         cam = Camera.main;
-        outlinedObjects = FindObjectsOfType<Outlined>();
+        distanceComparer = new DistanceComparer(cam.transform);
+        outlinedObjects = new List<Outlined>();
+        var found = FindObjectsOfType<Outlined>();
+        foreach (var outlined in found)
+        {
+            outlinedObjects.Add(outlined);
+        }
+
         cmd = new CommandBuffer();
         cmd.name = "Outline";
         cam.AddCommandBuffer(CameraEvent.BeforeForwardAlpha, cmd);
 
-        silhouetteMaterial = new Material(Shader.Find("Outline/Silhouette"));
+        
         outlineMaterial = new Material(Shader.Find("Outline/Outline"));
 
         JfaInitKernerlID = jumpFloodShader.FindKernel("Init");
@@ -44,6 +73,8 @@ public class OutlineRenderer : MonoBehaviour
 
     private void Update()
     {
+        outlinedObjects.Sort(distanceComparer);
+
         outlineMaterial.SetFloat("_Width", width);
         outlineMaterial.SetFloat("_Softness", softness);
 
@@ -51,13 +82,13 @@ public class OutlineRenderer : MonoBehaviour
         cmd.Clear();
         cmd.SetRenderTarget(silhouetteBuffer);
         cmd.ClearRenderTarget(true, true, Color.clear);
-        for (int i = 0; i < outlinedObjects.Length; i++)
+        for (int i = 0; i < outlinedObjects.Count; i++)
         {
             cmd.SetGlobalFloat("_ObjectID", (i + 1) / 4f);
-            cmd.DrawRenderer(outlinedObjects[i].Renderer, silhouetteMaterial);
+            cmd.DrawRenderer(outlinedObjects[i].Renderer, outlinedObjects[i].SilhouetteMaterial);
         }
         
-        DoJumpFlood(cmd, 3);
+        DoJumpFlood(cmd, 5);
         cmd.Blit(jumpFloodBuffer0, BuiltinRenderTextureType.CameraTarget, outlineMaterial);
     }
 
