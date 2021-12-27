@@ -1,4 +1,4 @@
-Shader "Outline/Silhouette"
+Shader "Hidden/Outline/Silhouette"
 {
     Properties
     {
@@ -37,6 +37,7 @@ Shader "Outline/Silhouette"
             }
 
             float _ObjectID;
+            float _ColorID;
             sampler2D _MainTex;
 
             float frag (Varyings input) : SV_Target

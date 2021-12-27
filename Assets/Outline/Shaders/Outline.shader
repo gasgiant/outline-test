@@ -1,4 +1,4 @@
-Shader "Outline/Outline"
+Shader "Hidden/Outline/Outline"
 {
     Properties
     {
@@ -45,13 +45,11 @@ Shader "Outline/Outline"
                 int2 uvInt = int2(input.positionHCS.xy);
 
                 float2 pos = _MainTex.Load(int3(uvInt, 0)).rg;
-
-                if (pos.x == -1)
-                    return 0;
+                clip(pos.x);
 
                 float distance = length(pos - input.positionHCS.xy + 0.5);
 
-                float alpha = saturate((_Width - distance) / (100 * _Softness + 0.05)) * (distance > 0);
+                float alpha = saturate((_Width - distance) / (50 * _Softness + 0.05)) * (distance > 0);
 
                 return float4(1, 0, 0, alpha);
             }

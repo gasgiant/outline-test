@@ -19,14 +19,13 @@ uint StepWidth;
 void Init(uint3 id : SV_DispatchThreadID)
 {
     float value = Silhouette[id.xy];
-    if (value > 0.01)
-        //Output[id.xy] = float4(id.xy, Depth[id.xy], value);
+    if (value > 0)
         Output[id.xy] = float4(id.xy, value, value);
     else
         Output[id.xy] = JFA_NULL;
 }
 
-[numthreads(8,8,1)]
+[numthreads(8, 8, 1)]
 void JumpFloodStep (uint3 id : SV_DispatchThreadID)
 {
     float bestDist = 1.#INF;
