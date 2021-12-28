@@ -15,6 +15,17 @@ uint StepWidth;
 float OutlineWidthSquared;
 
 #define JFA_NULL -1.0
+const static int2 directions[8] = 
+{
+    int2(-1, -1),
+    int2(-1, 0),
+    int2(-1, 1),
+    int2(0, -1),
+    int2(0, 1),
+    int2(1, -1),
+    int2(1, 0),
+    int2(1, 1)
+};
 
 [numthreads(8, 8, 1)]
 void Init(uint3 id : SV_DispatchThreadID)
@@ -30,21 +41,19 @@ void Init(uint3 id : SV_DispatchThreadID)
 void JumpFloodStep (uint3 id : SV_DispatchThreadID)
 {
     float objectID = Silhouette[id.xy].x;
-    float bestDist = 1.#INF;
-    //float4 closestPointData = float4(id.xy, objectID, 0);
     float4 closestPointData = Input[id.xy];
-
+    float bestDist = 1.#INF;
+    
     [unroll]
-    for (int u = -1; u <= 1; u++)
+    for (int i = 0; i < 8; i++)
     {
-        [unroll]
-        for (int v = -1; v <= 1; v++)
+        int2 offsetCoord = clamp(id.xy + directions[i] * StepWidth, 0, int2(BufferWidth - 1, BufferHeight - 1));
+        float4 neighbourData = Input[offsetCoord];
+
+        if (neighbourData.x != JFA_NULL)
         {
-            int2 offsetCoord = clamp(id.xy + int2(u, v) * StepWidth, 0, int2(BufferWidth - 1, BufferHeight - 1));
-            float4 neighbourData = Input[offsetCoord];
             float2 disp = neighbourData.xy - id.xy;
             float dist = dot(disp, disp);
-
             bool b;
             if (closestPointData.z == neighbourData.z 
                 || bestDist > OutlineWidthSquared
@@ -53,22 +62,13 @@ void JumpFloodStep (uint3 id : SV_DispatchThreadID)
             else
                 b = closestPointData.z < neighbourData.z;
 
-
-            if (neighbourData.x != JFA_NULL && b)
+            if (b && (objectID == JFA_NULL || objectID < neighbourData.z))
             {
-                if (objectID == JFA_NULL || (objectID < neighbourData.z))
-                {
-                    bestDist = dist;
-                    closestPointData = neighbourData;
-                }
+                bestDist = dist;
+                closestPointData = neighbourData;
             }
         }
     }
 
     Output[id.xy] = closestPointData;
-
-    //if (objectID == JFA_NULL)
-    //    Output[id.xy] = bestDist < 1.#INF ? closestPointData : JFA_NULL;
-    //else
-    //    Output[id.xy] = closestPointData;
 }

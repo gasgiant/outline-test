@@ -6,6 +6,7 @@ using UnityEngine.Rendering;
 [ExecuteAlways]
 public class OutlineRenderer : MonoBehaviour
 {
+    [SerializeField] bool enableDepthTest;
     [SerializeField, Range(0, 50)] private float pixelWidth = 2;
     [SerializeField, Range(0, 1)] private float softness;
     [SerializeField] private Color[] colors = { Color.red };
@@ -17,6 +18,7 @@ public class OutlineRenderer : MonoBehaviour
 
     private const CameraEvent cameraEvent = CameraEvent.BeforeForwardAlpha;
     private const int ColorsCount = 32;
+    public const string DepthTestKeyword = "OUTLINE_DEPTH_TEST";
     public const string SilhouetteShaderName = "Hidden/Outline/Silhouette";
     public const string OutlineShaderName = "Hidden/Outline/Outline";
     public static int JumpFloodIterations(float outlinePixelWidth)
@@ -84,6 +86,10 @@ public class OutlineRenderer : MonoBehaviour
     {
         outlineMaterial.SetFloat(PropIDs.OutlinePixelWidth, pixelWidth);
         outlineMaterial.SetFloat(PropIDs.OutlineSoftness, softness);
+        if (enableDepthTest)
+            outlineMaterial.EnableKeyword(DepthTestKeyword);
+        else
+            outlineMaterial.DisableKeyword(DepthTestKeyword);
 
         for (int i = 0; i < Mathf.Min(ColorsCount, colors.Length); i++)
         {

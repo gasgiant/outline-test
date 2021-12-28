@@ -16,6 +16,8 @@ Shader "Hidden/Outline/Outline"
             #pragma vertex vert
             #pragma fragment frag
 
+            #pragma multi_compile _ OUTLINE_DEPTH_TEST
+
             #include "UnityCG.cginc"
             #define COLORS_COUNT 32
 
@@ -36,6 +38,7 @@ Shader "Hidden/Outline/Outline"
                 return output;
             }
 
+            Texture2D _CameraDepthTexture;
             Texture2D _MainTex;
             float4 _MainTex_TexelSize;
             float _OutlinePixelWidth;
@@ -45,17 +48,22 @@ Shader "Hidden/Outline/Outline"
             float4 frag (Varyings input) : SV_Target
             {
                 int2 uvInt = int2(input.positionHCS.xy);
-
+                
                 float4 data = _MainTex.Load(int3(uvInt, 0));
                 float2 pos = data.xy;
                 clip(pos.x);
 
+                #ifdef OUTLINE_DEPTH_TEST
+                float backgroundDepth = _CameraDepthTexture.Load(int3(uvInt, 0));
+                float outlineDepth = _CameraDepthTexture.Load(int3(pos, 0));
+                clip(outlineDepth - backgroundDepth);
+                #endif
+                
                 float distance = length(pos - input.positionHCS.xy + 0.5);
-
-                float alpha = saturate((_OutlinePixelWidth - distance) / (50 * _OutlineSoftness + 0.05)) * (distance > 0);
+                
+                float alpha = saturate((_OutlinePixelWidth - distance) / max(_OutlinePixelWidth * _OutlineSoftness, 0.05)) * (distance > 0);
                 float4 c = _OutlineColors[round(data.a * COLORS_COUNT)];
                 c.a *= alpha;
-
                 return c;
             }
             ENDHLSL
