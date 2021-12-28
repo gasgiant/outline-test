@@ -3,6 +3,7 @@ using UnityEngine;
 [ExecuteAlways]
 public class OutlineTag : MonoBehaviour
 {
+    [Tooltip("Index of the outline color for the object. Edit colors in OutlineRenderer.")]
     [SerializeField] private int colorId;
     [SerializeField, HideInInspector] private OutlineRenderer outlineRenderer;
 
@@ -59,6 +60,7 @@ public class OutlineTag : MonoBehaviour
     {
         if (!outlineRenderer)
             outlineRenderer = FindObjectOfType<OutlineRenderer>();
+        colorId = Mathf.Clamp(colorId, 0, OutlineRenderer.ColorsCount);
     }
 
     private static class PropIDs

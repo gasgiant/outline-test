@@ -6,10 +6,14 @@ using UnityEngine.Rendering;
 [ExecuteAlways]
 public class OutlineRenderer : MonoBehaviour
 {
+    [Tooltip("If enabled, outline won't be rendered for occluded geometry.")]
     [SerializeField] bool occlusion;
+    [Tooltip("If enabled, outline will disappear behind occluders.")]
     [SerializeField] bool depthTest;
+    [Tooltip("Outline width in 1/100ths of screen height.")]
     [SerializeField, Range(0, 3)] private float width = 1;
     [SerializeField, Range(0, 1)] private float softness;
+    [Tooltip("Colors of the outline. Up to 64 colors supported.")]
     [SerializeField] private Color[] colors = { Color.red };
 
     [SerializeField, HideInInspector] private ComputeShader jumpFloodShader;
@@ -36,8 +40,8 @@ public class OutlineRenderer : MonoBehaviour
     public const string DepthTestKeyword = "OUTLINE_DEPTH_TEST";
     public const string SilhouetteShaderName = "Hidden/Outline/Silhouette";
     public const string OutlineShaderName = "Hidden/Outline/Outline";
+    public const int ColorsCount = 64;
     private const CameraEvent cameraEvent = CameraEvent.BeforeForwardAlpha;
-    private const int ColorsCount = 32;
 
     private Camera cam;
     private List<OutlineTag> outlinedObjects = new List<OutlineTag>();

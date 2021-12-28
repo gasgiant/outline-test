@@ -33,29 +33,31 @@ public class OutlineRendererEditor : Editor
     public override void OnInspectorGUI()
     {
         serializedObject.UpdateIfRequiredOrScript();
+        DrawProps();
+        DrawInfo();
+        FindShaders();
+        serializedObject.ApplyModifiedProperties();
+    }
 
+    private void DrawProps()
+    {
         using (new EditorGUI.DisabledScope(true))
         {
             EditorGUILayout.PropertyField(serializedObject.FindProperty("m_Script"));
         }
 
         EditorGUILayout.PropertyField(occlusion);
-        if (!occlusion.boolValue)
-        {
-            depthTest.boolValue = false;
-        }
         using (new EditorGUI.DisabledScope(!occlusion.boolValue))
         {
             EditorGUILayout.PropertyField(depthTest);
         }
-            
+
         EditorGUILayout.PropertyField(width);
         EditorGUILayout.PropertyField(softness);
         EditorGUILayout.PropertyField(colors);
 
-        DrawInfo();
-        FindShaders();
-        serializedObject.ApplyModifiedProperties();
+        if (colors.arraySize > OutlineRenderer.ColorsCount)
+            colors.arraySize = OutlineRenderer.ColorsCount;
     }
 
     private void DrawInfo()
