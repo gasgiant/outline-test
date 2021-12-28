@@ -13,7 +13,7 @@ public class OutlineRenderer : MonoBehaviour
     [Tooltip("Outline width in percents of screen height.")]
     [SerializeField, Range(0, 3)] private float width = 1;
     [SerializeField, Range(0, 1)] private float softness;
-    [Tooltip("Colors of the outline. Up to 256 colors supported.")]
+    [Tooltip("Colors of the outline. Up to 16 colors supported.")]
     [SerializeField] private Color[] colors = { Color.red };
 
     [SerializeField, HideInInspector] private ComputeShader jumpFloodShader;
@@ -40,7 +40,7 @@ public class OutlineRenderer : MonoBehaviour
     public const string DepthTestKeyword = "OUTLINE_DEPTH_TEST";
     public const string SilhouetteShaderName = "Hidden/Outline/Silhouette";
     public const string OutlineShaderName = "Hidden/Outline/Outline";
-    public const int ColorsCount = 256;
+    public const int ColorsCount = 16;
     private const CameraEvent cameraEvent = CameraEvent.BeforeForwardAlpha;
 
     private Camera cam;
