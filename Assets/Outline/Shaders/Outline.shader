@@ -19,7 +19,7 @@ Shader "Hidden/Outline/Outline"
             #pragma multi_compile _ OUTLINE_DEPTH_TEST
 
             #include "UnityCG.cginc"
-            #define COLORS_COUNT 64
+            #define COLORS_COUNT 256
 
             struct MeshData
             {
