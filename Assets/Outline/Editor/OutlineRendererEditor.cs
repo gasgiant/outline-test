@@ -4,7 +4,13 @@ using UnityEngine;
 [CustomEditor(typeof(OutlineRenderer))]
 public class OutlineRendererEditor : Editor
 {
-    private SerializedProperty pixelWidth;
+    private SerializedProperty occlusion;
+    private SerializedProperty depthTest;
+    private SerializedProperty width;
+    private SerializedProperty softness;
+    private SerializedProperty colors;
+
+
     private SerializedProperty jumpFloodShader;
     private SerializedProperty outlineShader;
     private SerializedProperty silhouetteShader;
@@ -12,7 +18,13 @@ public class OutlineRendererEditor : Editor
 
     private void OnEnable()
     {
-        pixelWidth = serializedObject.FindProperty("pixelWidth");
+        occlusion = serializedObject.FindProperty("occlusion");
+        depthTest = serializedObject.FindProperty("depthTest");
+        width = serializedObject.FindProperty("width");
+        softness = serializedObject.FindProperty("softness");
+        colors = serializedObject.FindProperty("colors");
+
+
         jumpFloodShader = serializedObject.FindProperty("jumpFloodShader");
         outlineShader = serializedObject.FindProperty("outlineShader");
         silhouetteShader = serializedObject.FindProperty("silhouetteShader");
@@ -21,7 +33,26 @@ public class OutlineRendererEditor : Editor
     public override void OnInspectorGUI()
     {
         serializedObject.UpdateIfRequiredOrScript();
-        DrawDefaultInspector();
+
+        using (new EditorGUI.DisabledScope(true))
+        {
+            EditorGUILayout.PropertyField(serializedObject.FindProperty("m_Script"));
+        }
+
+        EditorGUILayout.PropertyField(occlusion);
+        if (!occlusion.boolValue)
+        {
+            depthTest.boolValue = false;
+        }
+        using (new EditorGUI.DisabledScope(!occlusion.boolValue))
+        {
+            EditorGUILayout.PropertyField(depthTest);
+        }
+            
+        EditorGUILayout.PropertyField(width);
+        EditorGUILayout.PropertyField(softness);
+        EditorGUILayout.PropertyField(colors);
+
         DrawInfo();
         FindShaders();
         serializedObject.ApplyModifiedProperties();
@@ -34,8 +65,15 @@ public class OutlineRendererEditor : Editor
         EditorGUI.DrawRect(
             EditorGUILayout.GetControlRect(false, 1),
             EditorStyles.label.normal.textColor * 0.7f);
-        EditorGUILayout.LabelField("Jump Flood Passes: "
-            + OutlineRenderer.JumpFloodIterations(pixelWidth.floatValue));
+        EditorGUILayout.LabelField("Jump Flood Passes 1080p: "
+            + OutlineRenderer.JumpFloodIterations(
+                OutlineRenderer.PixelWidth(width.floatValue, 1080)));
+        EditorGUILayout.LabelField("Jump Flood Passes 1440p: "
+            + OutlineRenderer.JumpFloodIterations(
+                OutlineRenderer.PixelWidth(width.floatValue, 1440)));
+        EditorGUILayout.LabelField("Jump Flood Passes 2160p: "
+            + OutlineRenderer.JumpFloodIterations(
+                OutlineRenderer.PixelWidth(width.floatValue, 2160)));
     }
 
     private void FindShaders()

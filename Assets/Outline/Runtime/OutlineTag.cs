@@ -1,8 +1,10 @@
 using UnityEngine;
 
+[ExecuteAlways]
 public class OutlineTag : MonoBehaviour
 {
     [SerializeField] private int colorId;
+    [SerializeField, HideInInspector] private OutlineRenderer outlineRenderer;
 
     public int ColorID => colorId;
 
@@ -42,6 +44,22 @@ public class OutlineTag : MonoBehaviour
     private static Shader silhouetteShader;
     private Renderer mainRenderer;
     private Material silhouetteMaterial;
+
+    private void OnEnable()
+    {
+        outlineRenderer.AddOutlinedObject(this);
+    }
+
+    private void OnDisable()
+    {
+        outlineRenderer.RemoveOutlinedObject(this);
+    }
+
+    private void OnValidate()
+    {
+        if (!outlineRenderer)
+            outlineRenderer = FindObjectOfType<OutlineRenderer>();
+    }
 
     private static class PropIDs
     {

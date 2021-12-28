@@ -6,8 +6,9 @@ using UnityEngine.Rendering;
 [ExecuteAlways]
 public class OutlineRenderer : MonoBehaviour
 {
-    [SerializeField] bool enableDepthTest;
-    [SerializeField, Range(0, 50)] private float pixelWidth = 2;
+    [SerializeField] bool occlusion;
+    [SerializeField] bool depthTest;
+    [SerializeField, Range(0, 3)] private float width = 1;
     [SerializeField, Range(0, 1)] private float softness;
     [SerializeField] private Color[] colors = { Color.red };
 
@@ -16,16 +17,30 @@ public class OutlineRenderer : MonoBehaviour
     // need it to be serialized, so shader doesn't get stripped out of the build
     [SerializeField, HideInInspector] private Shader silhouetteShader;
 
-    private const CameraEvent cameraEvent = CameraEvent.BeforeForwardAlpha;
-    private const int ColorsCount = 32;
+    public void AddOutlinedObject(OutlineTag obj)
+    {
+        if (!outlinedObjects.Contains(obj))
+            outlinedObjects.Add(obj);
+    }
+
+    public void RemoveOutlinedObject(OutlineTag obj)
+    {
+        if (!outlinedObjects.Contains(obj))
+            outlinedObjects.Add(obj);
+    }
+
+    public static float PixelWidth(float width, float resolution) => width * resolution * 0.01f;
+    public static int JumpFloodIterations(float pixelWidth)
+        => Mathf.CeilToInt(Mathf.Log(pixelWidth + 1f, 2f));
+
     public const string DepthTestKeyword = "OUTLINE_DEPTH_TEST";
     public const string SilhouetteShaderName = "Hidden/Outline/Silhouette";
     public const string OutlineShaderName = "Hidden/Outline/Outline";
-    public static int JumpFloodIterations(float outlinePixelWidth)
-        => Mathf.CeilToInt(Mathf.Log(outlinePixelWidth + 1.0f, 2f));
+    private const CameraEvent cameraEvent = CameraEvent.BeforeForwardAlpha;
+    private const int ColorsCount = 32;
 
     private Camera cam;
-    private List<OutlineTag> outlinedObjects;
+    private List<OutlineTag> outlinedObjects = new List<OutlineTag>();
     private System.Comparison<OutlineTag> distanceCompareFunc;
 
     private CommandBuffer cmd;
@@ -34,12 +49,14 @@ public class OutlineRenderer : MonoBehaviour
     private RenderTexture jumpFloodBuffer1;
     private Material outlineMaterial;
     private Vector4[] colorsArray = new Vector4[ColorsCount];
+    private float pixelWidth;
 
     private int JfaInitKernerlID;
     private int JfaStepKernerlID;
 
     private void OnEnable()
     {
+        Initialize();
         Camera.onPreRender += ApplyCommandBuffer;
         Camera.onPostRender += RemoveCommandBuffer;
     }
@@ -50,15 +67,15 @@ public class OutlineRenderer : MonoBehaviour
         Camera.onPostRender -= RemoveCommandBuffer;
     }
 
-    private void Awake()
+    private void OnDestroy()
     {
-        outlinedObjects = new List<OutlineTag>();
-        var found = FindObjectsOfType<OutlineTag>();
-        foreach (var outlined in found)
-        {
-            outlinedObjects.Add(outlined);
-        }
+        if (silhouetteBuffer) silhouetteBuffer.Release();
+        if (jumpFloodBuffer0) jumpFloodBuffer0.Release();
+        if (jumpFloodBuffer1) jumpFloodBuffer1.Release();
+    }
 
+    private void Initialize()
+    {
         cmd = new CommandBuffer();
         cmd.name = "Outline";
 
@@ -75,30 +92,6 @@ public class OutlineRenderer : MonoBehaviour
         };
     }
 
-    private void OnDestroy()
-    {
-        silhouetteBuffer?.Release();
-        jumpFloodBuffer0?.Release();
-        jumpFloodBuffer1?.Release();
-    }
-
-    private void Update()
-    {
-        outlineMaterial.SetFloat(PropIDs.OutlinePixelWidth, pixelWidth);
-        outlineMaterial.SetFloat(PropIDs.OutlineSoftness, softness);
-        if (enableDepthTest)
-            outlineMaterial.EnableKeyword(DepthTestKeyword);
-        else
-            outlineMaterial.DisableKeyword(DepthTestKeyword);
-
-        for (int i = 0; i < Mathf.Min(ColorsCount, colors.Length); i++)
-        {
-            colorsArray[i] = colors[i].linear;
-        }
-
-        outlineMaterial.SetVectorArray(PropIDs.OutlineColors, colorsArray);
-    }
-
     private void ApplyCommandBuffer(Camera cam)
     {
 #if UNITY_EDITOR
@@ -110,8 +103,7 @@ public class OutlineRenderer : MonoBehaviour
         {
             if (this.cam == cam)
             {
-                outlinedObjects.Sort(distanceCompareFunc);
-                InitRenderTextures(cam.pixelWidth, cam.pixelHeight);
+                SetupRender();
                 return;
             }
             else
@@ -119,10 +111,11 @@ public class OutlineRenderer : MonoBehaviour
         }
 
         this.cam = cam;
-        outlinedObjects.Sort(distanceCompareFunc);
-        InitRenderTextures(cam.pixelWidth, cam.pixelHeight);
+        SetupRender();
+
         SetupCommandBuffer(cmd);
         cam.AddCommandBuffer(cameraEvent, cmd);
+
     }
 
     private void RemoveCommandBuffer(Camera cam)
@@ -132,6 +125,31 @@ public class OutlineRenderer : MonoBehaviour
             cam.RemoveCommandBuffer(cameraEvent, cmd);
             this.cam = null;
         }
+    }
+
+    private void SetupRender()
+    {
+        pixelWidth = PixelWidth(width, cam.pixelHeight);
+        outlinedObjects.Sort(distanceCompareFunc);
+        InitRenderTextures(cam.pixelWidth, cam.pixelHeight);
+        SetMaterialProperties();
+    }
+
+    private void SetMaterialProperties()
+    {
+        outlineMaterial.SetFloat(PropIDs.OutlinePixelWidth, pixelWidth);
+        outlineMaterial.SetFloat(PropIDs.OutlineSoftness, softness);
+        if (depthTest)
+            outlineMaterial.EnableKeyword(DepthTestKeyword);
+        else
+            outlineMaterial.DisableKeyword(DepthTestKeyword);
+
+        for (int i = 0; i < Mathf.Min(ColorsCount, colors.Length); i++)
+        {
+            colorsArray[i] = colors[i].linear;
+        }
+
+        outlineMaterial.SetVectorArray(PropIDs.OutlineColors, colorsArray);
     }
 
     private void SetupCommandBuffer(CommandBuffer cmd)
@@ -145,8 +163,17 @@ public class OutlineRenderer : MonoBehaviour
 
     private void RenderSilhouette(CommandBuffer cmd)
     {
-        cmd.SetRenderTarget(silhouetteBuffer.colorBuffer, BuiltinRenderTextureType.Depth);
-        cmd.ClearRenderTarget(false, true, Color.clear);
+        if (occlusion)
+        {
+            cmd.SetRenderTarget(silhouetteBuffer.colorBuffer, BuiltinRenderTextureType.Depth);
+            cmd.ClearRenderTarget(false, true, Color.clear);
+        }
+        else
+        {
+            cmd.SetRenderTarget(silhouetteBuffer);
+            cmd.ClearRenderTarget(true, true, Color.clear);
+        }
+        
         for (int i = outlinedObjects.Count - 1; i >= 0; i--)
         {
             cmd.SetGlobalFloat(PropIDs.ObjectID, (i + 1f) / outlinedObjects.Count);
@@ -193,9 +220,9 @@ public class OutlineRenderer : MonoBehaviour
             || silhouetteBuffer.height != height
             || silhouetteBuffer.width != width)
         {
-            silhouetteBuffer?.Release();
-            jumpFloodBuffer0?.Release();
-            jumpFloodBuffer0?.Release();
+            if (silhouetteBuffer) silhouetteBuffer.Release();
+            if (jumpFloodBuffer0) jumpFloodBuffer0.Release();
+            if (jumpFloodBuffer1) jumpFloodBuffer1.Release();
 
             var silhouetteDescriptor = new RenderTextureDescriptor(width, height)
             {
@@ -203,7 +230,7 @@ public class OutlineRenderer : MonoBehaviour
                 graphicsFormat = GraphicsFormat.R8G8_UNorm,
 
                 msaaSamples = 1,
-                depthBufferBits = 0,
+                depthBufferBits = 16,
 
                 sRGB = false,
 

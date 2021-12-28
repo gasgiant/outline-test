@@ -43,13 +43,14 @@ void JumpFloodStep (uint3 id : SV_DispatchThreadID)
     float objectID = Silhouette[id.xy].x;
     float4 closestPointData = Input[id.xy];
     float bestDist = 1.#INF;
+
     
     [unroll]
     for (int i = 0; i < 8; i++)
     {
         int2 offsetCoord = clamp(id.xy + directions[i] * StepWidth, 0, int2(BufferWidth - 1, BufferHeight - 1));
         float4 neighbourData = Input[offsetCoord];
-
+    
         if (neighbourData.x != JFA_NULL)
         {
             float2 disp = neighbourData.xy - id.xy;
@@ -61,7 +62,7 @@ void JumpFloodStep (uint3 id : SV_DispatchThreadID)
                 b = dist < bestDist;
             else
                 b = closestPointData.z < neighbourData.z;
-
+    
             if (b && (objectID == JFA_NULL || objectID < neighbourData.z))
             {
                 bestDist = dist;
