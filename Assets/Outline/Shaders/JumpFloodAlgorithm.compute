@@ -3,24 +3,25 @@
 
 #include "UnityCG.cginc"
 
-Texture2D<float> Silhouette;
-Texture2D<float> Depth;
+// x - object ID, sorted by Z relative to camera
+// y - color ID
+Texture2D<float2> Silhouette;
 
 Texture2D<float4> Input;
 RWTexture2D<float4> Output;
-float OutlineWidth;
 uint BufferWidth;
 uint BufferHeight;
 uint StepWidth;
+float OutlineWidthSquared;
 
 #define JFA_NULL -1.0
 
 [numthreads(8, 8, 1)]
 void Init(uint3 id : SV_DispatchThreadID)
 {
-    float value = Silhouette[id.xy];
-    if (value > 0)
-        Output[id.xy] = float4(id.xy, value, value);
+    float2 value = Silhouette[id.xy];
+    if (value.x > 0)
+        Output[id.xy] = float4(id.xy, value.xy);
     else
         Output[id.xy] = JFA_NULL;
 }
@@ -28,8 +29,10 @@ void Init(uint3 id : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void JumpFloodStep (uint3 id : SV_DispatchThreadID)
 {
+    float objectID = Silhouette[id.xy].x;
     float bestDist = 1.#INF;
-    float4 data = Input[id.xy];
+    //float4 closestPointData = float4(id.xy, objectID, 0);
+    float4 closestPointData = Input[id.xy];
 
     [unroll]
     for (int u = -1; u <= 1; u++)
@@ -37,24 +40,35 @@ void JumpFloodStep (uint3 id : SV_DispatchThreadID)
         [unroll]
         for (int v = -1; v <= 1; v++)
         {
-            int2 offsetID = clamp(id.xy + int2(u, v) * StepWidth, 0, int2(BufferWidth - 1, BufferHeight - 1));
-            float4 potentialData = Input[offsetID];
-            float2 disp = potentialData.xy - id.xy;
+            int2 offsetCoord = clamp(id.xy + int2(u, v) * StepWidth, 0, int2(BufferWidth - 1, BufferHeight - 1));
+            float4 neighbourData = Input[offsetCoord];
+            float2 disp = neighbourData.xy - id.xy;
             float dist = dot(disp, disp);
 
-            if (potentialData.x != JFA_NULL && dist < bestDist)
+            bool b;
+            if (closestPointData.z == neighbourData.z 
+                || bestDist > OutlineWidthSquared
+                || dist > OutlineWidthSquared)
+                b = dist < bestDist;
+            else
+                b = closestPointData.z < neighbourData.z;
+
+
+            if (neighbourData.x != JFA_NULL && b)
             {
-                if (data.a <= -1 || (data.a < potentialData.z))
+                if (objectID == JFA_NULL || (objectID < neighbourData.z))
                 {
                     bestDist = dist;
-                    data.xyz = potentialData.xyz;
+                    closestPointData = neighbourData;
                 }
             }
         }
     }
 
-    if (data.a <= -1)
-        Output[id.xy] = bestDist < 1.#INF ? data : JFA_NULL;
-    else
-        Output[id.xy] = data;
+    Output[id.xy] = closestPointData;
+
+    //if (objectID == JFA_NULL)
+    //    Output[id.xy] = bestDist < 1.#INF ? closestPointData : JFA_NULL;
+    //else
+    //    Output[id.xy] = closestPointData;
 }

@@ -40,10 +40,10 @@ Shader "Hidden/Outline/Silhouette"
             float _ColorID;
             sampler2D _MainTex;
 
-            float frag (Varyings input) : SV_Target
+            float2 frag (Varyings input) : SV_Target
             {
                 if (tex2D(_MainTex, input.uv).a < 0.5) discard;
-                return _ObjectID;
+                return float2(_ObjectID, _ColorID);
             }
             ENDHLSL
         }

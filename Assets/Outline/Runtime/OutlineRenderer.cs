@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-//[ExecuteAlways]
+[ExecuteAlways]
 public class OutlineRenderer : MonoBehaviour
 {
     [SerializeField, Range(0, 50)] private float pixelWidth = 2;
@@ -15,6 +15,8 @@ public class OutlineRenderer : MonoBehaviour
     // need it to be serialized, so shader doesn't get stripped out of the build
     [SerializeField, HideInInspector] private Shader silhouetteShader;
 
+    private const CameraEvent cameraEvent = CameraEvent.BeforeForwardAlpha;
+    private const int ColorsCount = 32;
     public const string SilhouetteShaderName = "Hidden/Outline/Silhouette";
     public const string OutlineShaderName = "Hidden/Outline/Outline";
     public static int JumpFloodIterations(float outlinePixelWidth)
@@ -29,12 +31,7 @@ public class OutlineRenderer : MonoBehaviour
     private RenderTexture jumpFloodBuffer0;
     private RenderTexture jumpFloodBuffer1;
     private Material outlineMaterial;
-
-    private const CameraEvent cameraEvent = CameraEvent.BeforeForwardAlpha;
-    private readonly int SilhouetteParamId = Shader.PropertyToID("Silhouette");
-    private readonly int DepthParamId = Shader.PropertyToID("Depth");
-    private readonly int InputParamId = Shader.PropertyToID("Input");
-    private readonly int OutputParamId = Shader.PropertyToID("Output");
+    private Vector4[] colorsArray = new Vector4[ColorsCount];
 
     private int JfaInitKernerlID;
     private int JfaStepKernerlID;
@@ -85,11 +82,15 @@ public class OutlineRenderer : MonoBehaviour
 
     private void Update()
     {
-        if (cam != null)
-            outlinedObjects.Sort(distanceCompareFunc);
+        outlineMaterial.SetFloat(PropIDs.OutlinePixelWidth, pixelWidth);
+        outlineMaterial.SetFloat(PropIDs.OutlineSoftness, softness);
 
-        outlineMaterial.SetFloat("_Width", pixelWidth);
-        outlineMaterial.SetFloat("_Softness", softness);
+        for (int i = 0; i < Mathf.Min(ColorsCount, colors.Length); i++)
+        {
+            colorsArray[i] = colors[i].linear;
+        }
+
+        outlineMaterial.SetVectorArray(PropIDs.OutlineColors, colorsArray);
     }
 
     private void ApplyCommandBuffer(Camera cam)
@@ -102,12 +103,17 @@ public class OutlineRenderer : MonoBehaviour
         if (this.cam != null)
         {
             if (this.cam == cam)
+            {
+                outlinedObjects.Sort(distanceCompareFunc);
+                InitRenderTextures(cam.pixelWidth, cam.pixelHeight);
                 return;
+            }
             else
                 RemoveCommandBuffer(cam);
         }
 
         this.cam = cam;
+        outlinedObjects.Sort(distanceCompareFunc);
         InitRenderTextures(cam.pixelWidth, cam.pixelHeight);
         SetupCommandBuffer(cmd);
         cam.AddCommandBuffer(cameraEvent, cmd);
@@ -127,6 +133,7 @@ public class OutlineRenderer : MonoBehaviour
         cmd.Clear();
         RenderSilhouette(cmd);
         DoJumpFlood(cmd, JumpFloodIterations(pixelWidth));
+        
         cmd.Blit(jumpFloodBuffer0, BuiltinRenderTextureType.CameraTarget, outlineMaterial);
     }
 
@@ -136,7 +143,8 @@ public class OutlineRenderer : MonoBehaviour
         cmd.ClearRenderTarget(false, true, Color.clear);
         for (int i = outlinedObjects.Count - 1; i >= 0; i--)
         {
-            cmd.SetGlobalFloat("_ObjectID", (i + 1f) / outlinedObjects.Count);
+            cmd.SetGlobalFloat(PropIDs.ObjectID, (i + 1f) / outlinedObjects.Count);
+            cmd.SetGlobalFloat(PropIDs.ColorID, outlinedObjects[i].ColorID / (float)ColorsCount);
             cmd.DrawRenderer(outlinedObjects[i].Renderer, outlinedObjects[i].SilhouetteMaterial);
         }
     }
@@ -147,39 +155,30 @@ public class OutlineRenderer : MonoBehaviour
         RenderTexture bf0 = startBuff ? jumpFloodBuffer0 : jumpFloodBuffer1;
         RenderTexture bf1 = startBuff ? jumpFloodBuffer1 : jumpFloodBuffer0;
 
-        cmd.SetComputeTextureParam(jumpFloodShader, JfaInitKernerlID, SilhouetteParamId, silhouetteBuffer);
-        cmd.SetComputeTextureParam(jumpFloodShader, JfaInitKernerlID, DepthParamId, Shader.GetGlobalTexture("_CameraDepthTexture"));
-        cmd.SetComputeTextureParam(jumpFloodShader, JfaInitKernerlID, OutputParamId, bf0);
+        cmd.SetComputeTextureParam(jumpFloodShader, JfaInitKernerlID, PropIDs.Silhouette, silhouetteBuffer);
+        cmd.SetComputeTextureParam(jumpFloodShader, JfaInitKernerlID, PropIDs.Output, bf0);
         cmd.DispatchCompute(jumpFloodShader, JfaInitKernerlID,
             ThreadGroupsCount(silhouetteBuffer.width), ThreadGroupsCount(silhouetteBuffer.height), 1);
 
         bool pingPong = false;
-        cmd.SetComputeFloatParam(jumpFloodShader, "OutlineWidth", pixelWidth);
-        cmd.SetComputeIntParam(jumpFloodShader, "BufferWidth", silhouetteBuffer.width);
-        cmd.SetComputeIntParam(jumpFloodShader, "BufferHeight", silhouetteBuffer.height);
+        cmd.SetComputeIntParam(jumpFloodShader, PropIDs.TargetWidth, silhouetteBuffer.width);
+        cmd.SetComputeIntParam(jumpFloodShader, PropIDs.TargetHeight, silhouetteBuffer.height);
+        cmd.SetComputeFloatParam(jumpFloodShader, PropIDs.OutlineWidthSquared, pixelWidth * pixelWidth);
+        cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, PropIDs.Silhouette, silhouetteBuffer);
 
         for (int i = 0; i < passes; i++)
         {
             int stepSize = Mathf.RoundToInt(Mathf.Pow(2, passes - 1 - i));
-            cmd.SetComputeIntParam(jumpFloodShader, "StepWidth", stepSize);
-
-            if (pingPong)
-            {
-                cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, InputParamId, bf1);
-                cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, OutputParamId, bf0);
-            }
-            else
-            {
-                cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, InputParamId, bf0);
-                cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, OutputParamId, bf1);
-            }
+            cmd.SetComputeIntParam(jumpFloodShader, PropIDs.StepWidth, stepSize);
+            cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, 
+                PropIDs.Input, pingPong ? bf1 : bf0);
+            cmd.SetComputeTextureParam(jumpFloodShader, JfaStepKernerlID, 
+                PropIDs.Output, pingPong ? bf0 : bf1);
 
             cmd.DispatchCompute(jumpFloodShader, JfaStepKernerlID,
                 ThreadGroupsCount(silhouetteBuffer.width), ThreadGroupsCount(silhouetteBuffer.height), 1);
-
             pingPong = !pingPong;
         }
-
     }
 
     private void InitRenderTextures(int width, int height)
@@ -195,7 +194,7 @@ public class OutlineRenderer : MonoBehaviour
             var silhouetteDescriptor = new RenderTextureDescriptor(width, height)
             {
                 dimension = TextureDimension.Tex2D,
-                graphicsFormat = GraphicsFormat.R8_UNorm,
+                graphicsFormat = GraphicsFormat.R8G8_UNorm,
 
                 msaaSamples = 1,
                 depthBufferBits = 0,
@@ -220,4 +219,24 @@ public class OutlineRenderer : MonoBehaviour
     }
 
     private static int ThreadGroupsCount(int threadsCount) => Mathf.CeilToInt(threadsCount / 8);
+
+    private static class PropIDs
+    {
+        public static readonly int Silhouette = Shader.PropertyToID("Silhouette");
+        public static readonly int Input = Shader.PropertyToID("Input");
+        public static readonly int Output = Shader.PropertyToID("Output");
+        public static readonly int TargetWidth = Shader.PropertyToID("TargetWidth");
+        public static readonly int TargetHeight = Shader.PropertyToID("TargetHeight");
+        public static readonly int StepWidth = Shader.PropertyToID("StepWidth");
+        public static readonly int OutlineWidthSquared = Shader.PropertyToID("OutlineWidthSquared");
+
+
+        public static readonly int OutlinePixelWidth = Shader.PropertyToID("_OutlinePixelWidth");
+        public static readonly int OutlineSoftness = Shader.PropertyToID("_OutlineSoftness");
+        public static readonly int OutlineColors = Shader.PropertyToID("_OutlineColors");
+        public static readonly int ObjectID = Shader.PropertyToID("_ObjectID");
+        public static readonly int ColorID = Shader.PropertyToID("_ColorID");
+
+
+    }
 }

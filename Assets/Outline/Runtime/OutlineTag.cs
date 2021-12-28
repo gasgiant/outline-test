@@ -4,6 +4,8 @@ public class OutlineTag : MonoBehaviour
 {
     [SerializeField] private int colorId;
 
+    public int ColorID => colorId;
+
     public Renderer Renderer
     {
         get
@@ -26,12 +28,12 @@ public class OutlineTag : MonoBehaviour
                 if (silhouetteShader == null)
                     silhouetteShader = Shader.Find(OutlineRenderer.SilhouetteShaderName);
                 silhouetteMaterial = new Material(silhouetteShader);
-                if (Renderer.sharedMaterial.HasProperty(PropIds.MainTex))
-                    silhouetteMaterial.SetTexture(PropIds.MainTex,
-                        Renderer.sharedMaterial.GetTexture(PropIds.MainTex));
-                if (Renderer.sharedMaterial.HasProperty(PropIds.Cutoff))
-                    silhouetteMaterial.SetFloat(PropIds.Cutoff,
-                        Renderer.sharedMaterial.GetFloat(PropIds.Cutoff));
+                if (Renderer.sharedMaterial.HasProperty(PropIDs.MainTex))
+                    silhouetteMaterial.SetTexture(PropIDs.MainTex,
+                        Renderer.sharedMaterial.GetTexture(PropIDs.MainTex));
+                if (Renderer.sharedMaterial.HasProperty(PropIDs.Cutoff))
+                    silhouetteMaterial.SetFloat(PropIDs.Cutoff,
+                        Renderer.sharedMaterial.GetFloat(PropIDs.Cutoff));
             }
             return silhouetteMaterial;
         }
@@ -41,7 +43,7 @@ public class OutlineTag : MonoBehaviour
     private Renderer mainRenderer;
     private Material silhouetteMaterial;
 
-    private static class PropIds
+    private static class PropIDs
     {
         public static readonly int MainTex = Shader.PropertyToID("_MainTex");
         public static readonly int Cutoff = Shader.PropertyToID("_Cutoff");

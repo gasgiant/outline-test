@@ -17,6 +17,7 @@ Shader "Hidden/Outline/Outline"
             #pragma fragment frag
 
             #include "UnityCG.cginc"
+            #define COLORS_COUNT 32
 
             struct MeshData
             {
@@ -37,21 +38,25 @@ Shader "Hidden/Outline/Outline"
 
             Texture2D _MainTex;
             float4 _MainTex_TexelSize;
-            float _Width;
-            float _Softness;
+            float _OutlinePixelWidth;
+            float _OutlineSoftness;
+            float4 _OutlineColors[COLORS_COUNT];
 
             float4 frag (Varyings input) : SV_Target
             {
                 int2 uvInt = int2(input.positionHCS.xy);
 
-                float2 pos = _MainTex.Load(int3(uvInt, 0)).rg;
+                float4 data = _MainTex.Load(int3(uvInt, 0));
+                float2 pos = data.xy;
                 clip(pos.x);
 
                 float distance = length(pos - input.positionHCS.xy + 0.5);
 
-                float alpha = saturate((_Width - distance) / (50 * _Softness + 0.05)) * (distance > 0);
+                float alpha = saturate((_OutlinePixelWidth - distance) / (50 * _OutlineSoftness + 0.05)) * (distance > 0);
+                float4 c = _OutlineColors[round(data.a * COLORS_COUNT)];
+                c.a *= alpha;
 
-                return float4(1, 0, 0, alpha);
+                return c;
             }
             ENDHLSL
         }
