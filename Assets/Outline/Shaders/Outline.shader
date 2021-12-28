@@ -40,7 +40,6 @@ Shader "Hidden/Outline/Outline"
 
             Texture2D _CameraDepthTexture;
             Texture2D _MainTex;
-            float4 _MainTex_TexelSize;
             float _OutlinePixelWidth;
             float _OutlineSoftness;
             float4 _OutlineColors[COLORS_COUNT];

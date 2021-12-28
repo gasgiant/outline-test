@@ -143,7 +143,7 @@ public class OutlineRenderer : MonoBehaviour
     {
         outlineMaterial.SetFloat(PropIDs.OutlinePixelWidth, pixelWidth);
         outlineMaterial.SetFloat(PropIDs.OutlineSoftness, softness);
-        if (depthTest)
+        if (depthTest && occlusion)
             outlineMaterial.EnableKeyword(DepthTestKeyword);
         else
             outlineMaterial.DisableKeyword(DepthTestKeyword);
@@ -248,6 +248,7 @@ public class OutlineRenderer : MonoBehaviour
             var jfaDescriptor = silhouetteDescriptor;
             jfaDescriptor.graphicsFormat = GraphicsFormat.R16G16B16A16_SFloat;
             jfaDescriptor.enableRandomWrite = true;
+            jfaDescriptor.depthBufferBits = 0;
             jumpFloodBuffer0 = new RenderTexture(jfaDescriptor);
             jumpFloodBuffer1 = new RenderTexture(jfaDescriptor);
             jumpFloodBuffer0.Create();
@@ -267,13 +268,10 @@ public class OutlineRenderer : MonoBehaviour
         public static readonly int StepWidth = Shader.PropertyToID("StepWidth");
         public static readonly int OutlineWidthSquared = Shader.PropertyToID("OutlineWidthSquared");
 
-
         public static readonly int OutlinePixelWidth = Shader.PropertyToID("_OutlinePixelWidth");
         public static readonly int OutlineSoftness = Shader.PropertyToID("_OutlineSoftness");
         public static readonly int OutlineColors = Shader.PropertyToID("_OutlineColors");
         public static readonly int ObjectID = Shader.PropertyToID("_ObjectID");
         public static readonly int ColorID = Shader.PropertyToID("_ColorID");
-
-
     }
 }

@@ -10,11 +10,9 @@ public class OutlineRendererEditor : Editor
     private SerializedProperty softness;
     private SerializedProperty colors;
 
-
     private SerializedProperty jumpFloodShader;
     private SerializedProperty outlineShader;
     private SerializedProperty silhouetteShader;
-
 
     private void OnEnable()
     {

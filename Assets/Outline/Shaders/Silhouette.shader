@@ -2,7 +2,8 @@ Shader "Hidden/Outline/Silhouette"
 {
     Properties
     {
-        _MainTex("Source", 2D) = "" {}
+        _MainTex("Albedo", 2D) = "" {}
+        _Cutoff("Cutoff", Float) = 0.5
     }
     SubShader
     {
@@ -39,10 +40,11 @@ Shader "Hidden/Outline/Silhouette"
             float _ObjectID;
             float _ColorID;
             sampler2D _MainTex;
+            float _Cutoff;
 
             float2 frag (Varyings input) : SV_Target
             {
-                if (tex2D(_MainTex, input.uv).a < 0.5) discard;
+                if (tex2D(_MainTex, input.uv).a < _Cutoff) discard;
                 return float2(_ObjectID, _ColorID);
             }
             ENDHLSL
